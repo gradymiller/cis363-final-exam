@@ -17,7 +17,7 @@ python runtime: 14 seconds
 - Mark Tasks as -- COMPLETE when finished
 - Add descriptions to each of the tasks specifically for the problem
 - Think of best way to represent state
-- 
+- Zero out using i and j pointers on triangular matrix, swap when hit diag
 
 
 ## Tasks:
@@ -33,3 +33,7 @@ python runtime: 14 seconds
 3.
 4.
 5.
+
+
+
+
