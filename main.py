@@ -1,35 +1,41 @@
+# TODO: convert to a list of edges instead of adjacency matrix?
 import numpy as np
 
 
 class State:
     def __init__(self, n):
-       self.matrix = np.zeros((n, n)) # adjacency matrix
-       self.curr_size: int = 0 # number of included vertices
-       self.included: int = 0 # bitstring
-       self.excluded: int = 0 # bitstring
+       self.matrix = np.zeros((n, n))
+       self.curr_size: int = 0
+       self.included: int = 0
+       self.excluded: int = 0
        #self.mask: int = 0 # for included/excluded
-       self.completed_mask = np.zeros((n, n)) # all zeros, when done
+       self.completed_mask = np.zeros((n, n))
 
 
 def solver(state, best_size):
+
+    # TODO: Add a bound here that compares current and best_size so below works
     idx = next_index(state)
     if idx == -1:
-        return state.curr_size;
+        return
+
+    exclude_state = state
 
     # include -> state(updated)
-    in_state = state # copy state
-    in_state.matrix[idx, :] = 0 # zero out row/col
-    in_state.matrix[:, idx] = 0
-    in_state.included |= (1 << idx) # set them as included
-    in_state.curr_size += 1 
-    in_sol = solver(in_state, best_size)
+    state.matrix[idx, :] = 0
+    state.matrix[:, idx] = 0
+    state.included |= (1 << idx)
+    state.curr_size += 1 
+    solver(state, best_size)
 
+    best_size = min(best_size, state.curr_size)
+    
     # exclude -> state
-    state.excluded |= (1 << idx) # set them as excluded
-    ex_sol = solver(state, best_size)
+    state.excluded |= (1 << idx)
+    solver(exclude_state, best_size)
 
-    best_size = min(in_sol, ex_sol, best_size)
-    return best_size
+    best_size = min(best_size, exclude_state.curr_size)
+    return
 
 def next_index(state) -> int:
     max_vals = 0
@@ -71,17 +77,18 @@ if __name__ == "__main__":
     
     matrix = np.zeros((n, n))
 
-    # Use triangular later
+    # TODO: Use triangular later
     for _ in range(m):
         row, col = list(map(int, input().split()))
         matrix[row, col] = 1
         matrix[col, row] = 1
     
+    # Create initial state
     state = State(n)
     state.matrix = matrix
 
+    # Get solution
     best_guess = approximate(state)
+    solver(state, best_guess)
 
-    sol = solver(state, best_guess)
-    print(sol)
-    print(state.included)
+    print(state.curr_size)
