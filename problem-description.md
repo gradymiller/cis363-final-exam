@@ -18,6 +18,7 @@ python runtime: 14 seconds
 - Add descriptions to each of the tasks specifically for the problem
 - Think of best way to represent state
 - Zero out using i and j pointers on triangular matrix, swap when hit diag
+- Use a list of edges or a dictionary of nodes and bitstrings
 
 
 ## Tasks:
