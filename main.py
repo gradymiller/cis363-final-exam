@@ -6,24 +6,40 @@ class State:
        self.matrix = np.zeros((n, n)) # adjacency matrix
        self.curr_size: int = 0 # number of included vertices
        self.included: int = 0 # bitstring
+       self.excluded: int = 0 # bitstring
        #self.mask: int = 0 # for included/excluded
        self.completed_mask = np.zeros((n, n)) # all zeros, when done
 
 
 def solver(state, best_size):
+    idx = next_index(state)
+    if idx == -1:
+        return state.curr_size;
+
     # include -> state(updated)
+    in_state = state # copy state
+    in_state.matrix[idx, :] = 0 # zero out row/col
+    in_state.matrix[:, idx] = 0
+    in_state.included |= (1 << idx) # set them as included
+    in_state.curr_size += 1 
+    in_sol = solver(in_state, best_size)
+
     # exclude -> state
-    # best_size = min(include, exclude, best_size)
-    pass
+    state.excluded |= (1 << idx) # set them as excluded
+    ex_sol = solver(state, best_size)
+
+    best_size = min(in_sol, ex_sol, best_size)
+    return best_size
 
 def next_index(state) -> int:
     max_vals = 0
     index = -1
     for idx in range(state.matrix.shape[0]):
-        vals = np.count_nonzero(matrix[idx])
-        if vals > max_vals:
-            max_vals = vals
-            index = idx
+        if (state.included & (1 << idx) == 0) and (state.excluded & (1 << idx) == 0):
+            vals = np.count_nonzero(matrix[idx])
+            if vals > max_vals:
+                max_vals = vals
+                index = idx
 
     return index
 
@@ -66,5 +82,6 @@ if __name__ == "__main__":
 
     best_guess = approximate(state)
 
-    #solver(state, best_guess)
-    print(best_guess)
+    sol = solver(state, best_guess)
+    print(sol)
+    print(state.included)
