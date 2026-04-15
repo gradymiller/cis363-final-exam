@@ -6,6 +6,7 @@ class State:
         #self.n = len(nodes)
         self.curr_size = 0 # just a normal int
         self.considered = 0 # 200 bits long
+        self.zeroed = 0
         self.mask = (1 << len(nodes)) - 1 # 200 bits long
 
 
@@ -32,7 +33,7 @@ def next_index(state):
 
     return best_idx
 
-def include_vertex(state, idx):
+def include_node(state, idx):
 
     # remove idx from all neighbors
     curr_mask = state.nodes[idx]
@@ -46,9 +47,12 @@ def include_vertex(state, idx):
         curr = (curr_mask & -curr_mask).bit_length() - 1 # [1]
         curr_mask &= curr_mask - 1 # [2]
         state.nodes[curr] &= ~(1 << idx) # [3]
+        if state.nodes[curr] == 0:
+            state.zeroed |= (1 << curr)
 
     # [4]
     state.nodes[idx] = 0
+    state.zeroed |= (1 << idx)
     state.curr_size = state.curr_size + 1
     state.considered = state.considered | (1 << idx)
 
@@ -56,24 +60,31 @@ def include_vertex(state, idx):
 def approximate(state):
     # Runs in place on the state
     while True:
-        if all(node == 0 for node in state.nodes):
+        if state.zeroed == state.mask:
             return
 
         idx = next_index(state)
         if idx == -1:
             return
 
-        include_vertex(state, idx)
+        include_node(state, idx)
     
 
-def solve(state, best_guess):
-    # Bound
+def solve(state, best_state):
+    if state.curr_size >= best_state.curr_size:
+        return
+
+    idx = next_index(state)    
+    if idx == -1:
+        return
+
+   exclude_state = state 
 
     # Include
+    include_node(state, idx)
 
     # Exclude
-
-    pass
+    
 
 
 
@@ -95,4 +106,3 @@ if __name__ == "__main__":
     print(best_state.curr_size)
 
     #solver(state, best_guess)
-
