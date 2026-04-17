@@ -29,9 +29,9 @@ python runtime: 14 seconds
 
 
 ## Simplifications:
-1.
-2.
-3.
+1. exclude with zero edges
+2. include neighbors if degree 1
+3. 
 4.
 5.
 

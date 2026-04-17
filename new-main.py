@@ -1,4 +1,5 @@
 import copy
+import time
 
 class State:
     def __init__(self, nodes, edges_left):
@@ -79,6 +80,33 @@ def approximate(state):
         include_node(state, idx)
     
 
+def simplify(state):
+
+    changes = True
+    while changes:
+        changes = False
+        not_considered = ~(state.considered) & state.mask
+        while not_considered:
+            curr = (not_considered & -not_considered).bit_length() - 1
+            not_considered &= not_considered - 1
+
+            curr_node = state.nodes[curr]
+
+
+            # Remove nodes with degree zero
+            if curr_node == 0:
+                exclude_node(state, curr)
+                changes = True
+
+            # Include when there is a path
+            elif curr_node.bit_count() == 1:
+                include_node(state, curr_node.bit_length() - 1)
+                changes = True
+
+
+    
+
+
 def solve(state, best_state):
 
     # Return if solved, update if better than best_state
@@ -139,18 +167,24 @@ if __name__ == "__main__":
     n, m = map(int, input().split())
 
     nodes = [0] * n
+    matched = set()
 
     for _ in range(m):
         u, v = map(int, input().split())
         nodes[u] |= (1 << v)
         nodes[v] |= (1 << u)
+        
 
     # Make our two states that we need
     state = State(nodes, m)
     best_state = copy.deepcopy(state)
     best_state.curr_size = n
-    
+
     approximate(best_state)
+    start = time.time()
+    simplify(state)
     solve(state, best_state)
-    print(best_state.curr_size)
+    end = time.time()
+    print("MIN:", best_state.curr_size)
+    print("TIME:", end - start)
     
