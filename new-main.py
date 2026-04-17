@@ -2,7 +2,7 @@ import copy
 import time
 
 class State:
-    def __init__(self, nodes, edges_left):
+    def __init__(self, nodes, edges_left, min_required):
         self.nodes = nodes[:]             
         #self.n = len(nodes)
         self.curr_size = 0 # just a normal int
@@ -10,6 +10,8 @@ class State:
         self.zeroed = 0 # bitstring
         self.edges_left = edges_left # int
         self.mask = (1 << len(nodes)) - 1 # 200 bits long
+        self.min_required = min_required
+        self.num_branches = 0
 
 
 def next_index(state):
@@ -28,14 +30,19 @@ def next_index(state):
         undecided_mask &= undecided_mask - 1
 
         # Keep if better
-        val = state.nodes[curr].bit_count()
+        #val = state.nodes[curr].bit_count()
+        val = (state.nodes[curr] & ~state.considered).bit_count()
         if val > best_val:
             best_val = val
             best_idx = curr
 
     return best_idx
 
-def include_node(state, idx):
+def include_node(state, idx, required_edges):
+
+    # Check if idx is already added to considered
+    if (state.considered >> idx) & 1:
+        return
 
     # Bitstring of neighbors to node being included
     neighbors = state.nodes[idx]
@@ -52,6 +59,8 @@ def include_node(state, idx):
 
         # Remove node being included from the current neighbor (LSB)
         state.nodes[curr] &= ~(1 << idx)
+        if required_edges[curr] & (1 << idx) != 0:
+            state.min_required -= 1
 
         # If that neighbor becomes empty, mark it in zeroed
         if state.nodes[curr] == 0:
@@ -67,7 +76,7 @@ def include_node(state, idx):
 def exclude_node(state, idx):
     state.considered |= (1 << idx)
 
-def approximate(state):
+def approximate(state, required_edges):
     # Runs in place on the state
     while True:
         if state.zeroed == state.mask:
@@ -77,10 +86,10 @@ def approximate(state):
         if idx == -1:
             return
 
-        include_node(state, idx)
+        include_node(state, idx, required_edges)
     
 
-def simplify(state):
+def simplify(state, required_edges):
 
     changes = True
     while changes:
@@ -100,14 +109,16 @@ def simplify(state):
 
             # Include when there is a path
             elif curr_node.bit_count() == 1:
-                include_node(state, curr_node.bit_length() - 1)
+                state.considered |= (1 << curr)
+                include_node(state, curr_node.bit_length() - 1, required_edges)
                 changes = True
 
 
     
 
 
-def solve(state, best_state):
+def solve(state, best_state, required_edges):
+    state.num_branches += 1
 
     # Return if solved, update if better than best_state
     if state.zeroed == state.mask:
@@ -144,6 +155,7 @@ def solve(state, best_state):
     if max_edges == 0:
         return
     bound =  (state.edges_left + max_edges - 1) // max_edges
+    bound = max(bound, state.min_required)
     if state.curr_size + bound >= best_state.curr_size:
         return
 
@@ -151,14 +163,14 @@ def solve(state, best_state):
     state_copy = copy.deepcopy(state)
 
     # Include
-    include_node(state, idx)
-    simplify(state)
-    solve(state, best_state)
+    include_node(state, idx, required_edges)
+    simplify(state, required_edges)
+    solve(state, best_state, required_edges)
 
     # Exclude
     exclude_node(state_copy, idx)
-    simplify(state_copy)
-    solve(state_copy, best_state)
+    simplify(state_copy, required_edges)
+    solve(state_copy, best_state, required_edges)
          
 
 
@@ -168,23 +180,34 @@ if __name__ == "__main__":
 
     nodes = [0] * n
     matched = set()
+    required_edges = [0] * n
+    min_required = 0
 
     for _ in range(m):
         u, v = map(int, input().split())
         nodes[u] |= (1 << v)
         nodes[v] |= (1 << u)
+        if u not in matched or v not in matched:
+            matched.add(u)
+            matched.add(v)
+            required_edges[u] |= (1 << v)
+            required_edges[v] |= (1 << u)
+            min_required += 1
+
         
 
     # Make our two states that we need
-    state = State(nodes, m)
+    state = State(nodes, m, min_required)
     best_state = copy.deepcopy(state)
-    best_state.curr_size = n
 
-    approximate(best_state)
+    #simplify(best_state, required_edges)
+    approximate(best_state, required_edges)
+    print("APPROX:", best_state.curr_size)
     start = time.time()
-    simplify(state)
-    solve(state, best_state)
+    simplify(state, required_edges)
+    solve(state, best_state, required_edges)
     end = time.time()
     print("MIN:", best_state.curr_size)
     print("TIME:", end - start)
+    print("BRANCHES:", best_state.num_branches)
     
