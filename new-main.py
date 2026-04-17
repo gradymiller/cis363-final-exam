@@ -1,12 +1,13 @@
 import copy
 
 class State:
-    def __init__(self, nodes):
+    def __init__(self, nodes, edges_left):
         self.nodes = nodes[:]             
         #self.n = len(nodes)
         self.curr_size = 0 # just a normal int
         self.considered = 0 # 200 bits long
-        self.zeroed = 0
+        self.zeroed = 0 # bitstring
+        self.edges_left = edges_left # int
         self.mask = (1 << len(nodes)) - 1 # 200 bits long
 
 
@@ -37,6 +38,7 @@ def include_node(state, idx):
 
     # Bitstring of neighbors to node being included
     neighbors = state.nodes[idx]
+    state.edges_left -= neighbors.bit_count()
 
     # Go through each of the neighbors so they can be updated
     while neighbors:
@@ -62,7 +64,7 @@ def include_node(state, idx):
 
 
 def exclude_node(state, idx):
-
+    state.considered |= (1 << idx)
 
 def approximate(state):
     # Runs in place on the state
@@ -81,24 +83,53 @@ def solve(state, best_state):
 
     # Return if solved, update if better than best_state
     if state.zeroed == state.mask:
-        if state.curr_size >= best_state.curr_size:
-            best_state = state
+        if state.curr_size < best_state.curr_size:
+            best_state.nodes = state.nodes[:]
+            best_state.curr_size = state.curr_size
+            best_state.considered = state.considered
+            best_state.zeroed = state.zeroed
+            best_state.edges_left = state.edges_left
         return
+
+    # Check if its even possible
+    not_considered = ~(state.considered) & state.mask
+    possible = 0
+    while not_considered:
+        curr = (not_considered & -not_considered).bit_length() - 1
+        not_considered &= not_considered - 1
+
+        possible += state.nodes[curr].bit_count()
+        #possible += (state.nodes[curr] >> curr).bit_count()
+        
+    if possible < state.edges_left:
+        return
+    
+
 
     idx = next_index(state)    
     if idx == -1:
         return
 
-    state_copy = state 
+    
+    # Bound
+    max_edges = state.nodes[idx].bit_count()
+    if max_edges == 0:
+        return
+    bound =  (state.edges_left + max_edges - 1) // max_edges
+    if state.curr_size + bound >= best_state.curr_size:
+        return
+
+
+    state_copy = copy.deepcopy(state)
 
     # Include
     include_node(state, idx)
-    #simplify(state)
+    simplify(state)
     solve(state, best_state)
 
     # Exclude
     exclude_node(state_copy, idx)
-    #simplify(state_copy)
+    simplify(state_copy)
     solve(state_copy, best_state)
          
 
@@ -115,10 +146,11 @@ if __name__ == "__main__":
         nodes[v] |= (1 << u)
 
     # Make our two states that we need
-    state = State(nodes)
-    best_state = State(nodes)
+    state = State(nodes, m)
+    best_state = copy.deepcopy(state)
+    best_state.curr_size = n
     
     approximate(best_state)
-    solver(state, best_state)
+    solve(state, best_state)
     print(best_state.curr_size)
     
