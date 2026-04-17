@@ -35,26 +35,33 @@ def next_index(state):
 
 def include_node(state, idx):
 
-    # remove idx from all neighbors
-    curr_mask = state.nodes[idx]
+    # Bitstring of neighbors to node being included
+    neighbors = state.nodes[idx]
 
-    # Go through the bits that the included one was connected to
-    # [1] Jump to the least significant bit
-    # [2] Remove that one from the neighbors (curr_mask)
-    # [3] Remove that included node from each neighbor (curr)
-    # [4] Update the state
-    while curr_mask:
-        curr = (curr_mask & -curr_mask).bit_length() - 1 # [1]
-        curr_mask &= curr_mask - 1 # [2]
-        state.nodes[curr] &= ~(1 << idx) # [3]
+    # Go through each of the neighbors so they can be updated
+    while neighbors:
+        
+        # Get index of LSB (a neighbor)
+        curr = (neighbors & -neighbors).bit_length() - 1
+
+        # Remove LSB (the neighbor) from remaining
+        neighbors &= neighbors - 1
+
+        # Remove node being included from the current neighbor (LSB)
+        state.nodes[curr] &= ~(1 << idx)
+
+        # If that neighbor becomes empty, mark it in zeroed
         if state.nodes[curr] == 0:
             state.zeroed |= (1 << curr)
 
-    # [4]
+    # Update the state after all neighbors have the included node removed
     state.nodes[idx] = 0
     state.zeroed |= (1 << idx)
     state.curr_size = state.curr_size + 1
     state.considered = state.considered | (1 << idx)
+
+
+def exclude_node(state, idx):
 
 
 def approximate(state):
@@ -71,20 +78,29 @@ def approximate(state):
     
 
 def solve(state, best_state):
-    if state.curr_size >= best_state.curr_size:
+
+    # Return if solved, update if better than best_state
+    if state.zeroed == state.mask:
+        if state.curr_size >= best_state.curr_size:
+            best_state = state
         return
 
     idx = next_index(state)    
     if idx == -1:
         return
 
-   exclude_state = state 
+    state_copy = state 
 
     # Include
     include_node(state, idx)
+    #simplify(state)
+    solve(state, best_state)
 
     # Exclude
-    
+    exclude_node(state_copy, idx)
+    #simplify(state_copy)
+    solve(state_copy, best_state)
+         
 
 
 
@@ -103,6 +119,6 @@ if __name__ == "__main__":
     best_state = State(nodes)
     
     approximate(best_state)
+    solver(state, best_state)
     print(best_state.curr_size)
-
-    #solver(state, best_guess)
+    
