@@ -1,94 +1,221 @@
-# TODO: convert to a list of edges instead of adjacency matrix?
-import numpy as np
-
+import copy
+import time
 
 class State:
-    def __init__(self, n):
-       self.matrix = np.zeros((n, n))
-       self.curr_size: int = 0
-       self.included: int = 0
-       self.excluded: int = 0
-       #self.mask: int = 0 # for included/excluded
-       self.completed_mask = np.zeros((n, n))
+    def __init__(self, nodes, edges_left, min_required):
+        self.nodes = nodes[:]             
+        #self.n = len(nodes)
+        self.curr_size = 0 # just a normal int
+        self.considered = 0 # 200 bits long
+        self.zeroed = 0 # bitstring
+        self.edges_left = edges_left # int
+        self.mask = (1 << len(nodes)) - 1 # 200 bits long
+        self.min_required = min_required
+        self.num_branches = 0
 
 
-def solver(state, best_size):
+def next_index(state):
+    best_idx = -1
+    best_val = -1
 
-    # TODO: Add a bound here that compares current and best_size so below works
-    idx = next_index(state)
-    if idx == -1:
+    # nodes not yet decided
+    undecided_mask = ~(state.considered) & state.mask
+
+    while undecided_mask:
+
+        # Get index of least significant bit of undecided mask
+        curr = (undecided_mask & -undecided_mask).bit_length() - 1
+
+        # Remove the least significant bit
+        undecided_mask &= undecided_mask - 1
+
+        # Keep if better
+        #val = state.nodes[curr].bit_count()
+        val = ((state.nodes[curr] & ~state.considered) & state.mask).bit_count()
+        if val > best_val:
+            best_val = val
+            best_idx = curr
+
+    return best_idx
+
+def include_node(state, idx, required_edges):
+
+    # Check if idx is already added to considered
+    if (state.considered >> idx) & 1:
         return
 
-    exclude_state = state
+    # Bitstring of neighbors to node being included
+    neighbors = state.nodes[idx] & state.mask
+    state.edges_left -= neighbors.bit_count()
 
-    # include -> state(updated)
-    state.matrix[idx, :] = 0
-    state.matrix[:, idx] = 0
-    state.included |= (1 << idx)
-    state.curr_size += 1 
-    solver(state, best_size)
+    # Go through each of the neighbors so they can be updated
+    while neighbors:
+        
+        # Get index of LSB (a neighbor)
+        curr = (neighbors & -neighbors).bit_length() - 1
 
-    best_size = min(best_size, state.curr_size)
-    
-    # exclude -> state
-    state.excluded |= (1 << idx)
-    solver(exclude_state, best_size)
+        # Remove LSB (the neighbor) from remaining
+        neighbors &= neighbors - 1
 
-    best_size = min(best_size, exclude_state.curr_size)
-    return
+        # Remove node being included from the current neighbor (LSB)
+        state.nodes[curr] &= ~(1 << idx)
+        if required_edges[curr] & (1 << idx) != 0:
+            state.min_required -= 1
 
-def next_index(state) -> int:
-    max_vals = 0
-    index = -1
-    for idx in range(state.matrix.shape[0]):
-        if (state.included & (1 << idx) == 0) and (state.excluded & (1 << idx) == 0):
-            vals = np.count_nonzero(matrix[idx])
-            if vals > max_vals:
-                max_vals = vals
-                index = idx
+        # If that neighbor becomes empty, mark it in zeroed
+        if state.nodes[curr] == 0:
+            state.zeroed |= (1 << curr)
 
-    return index
+    # Update the state after all neighbors have the included node removed
+    state.nodes[idx] = 0
+    state.zeroed |= (1 << idx)
+    state.curr_size = state.curr_size + 1
+    state.considered = state.considered | (1 << idx)
 
-def approximate(state: State) -> int:
-    while np.any(state.matrix):
+
+def exclude_node(state, idx):
+    state.considered |= (1 << idx)
+
+def approximate(state, required_edges):
+    # Runs in place on the state
+    while True:
+        if state.zeroed == state.mask:
+            return
 
         idx = next_index(state)
         if idx == -1:
-            return state.curr_size
+            return
 
-        state.matrix[idx, :] = 0
-        state.matrix[:, idx] = 0
+        include_node(state, idx, required_edges)
+    
 
-        state.curr_size += 1
+def simplify(state, required_edges):
 
-        #NOTE: Don't need this, but here for now
-        state.included |= (1 << idx)
+    changes = True
+    while changes:
+        changes = False
+        not_considered = ~(state.considered) & state.mask
+        while not_considered:
+            curr = (not_considered & -not_considered).bit_length() - 1
+            not_considered &= not_considered - 1
 
-    return state.curr_size
+            curr_node = state.nodes[curr] & state.mask
 
 
-    # repeat until valid solution
+            # Remove nodes with degree zero
+            if curr_node == 0:
+                exclude_node(state, curr)
+                changes = True
+
+            # Include when there is a path
+            elif curr_node.bit_count() == 1:
+                state.considered |= (1 << curr)
+                include_node(state, curr_node.bit_length() - 1, required_edges)
+                changes = True
+
+
+def solve(state, best_state, required_edges):
+    state.num_branches += 1
+
+    # Return if solved, update if better than best_state
+    if state.zeroed == state.mask:
+        if state.curr_size < best_state.curr_size:
+            best_state.nodes = state.nodes[:]
+            best_state.curr_size = state.curr_size
+            best_state.considered = state.considered
+            best_state.zeroed = state.zeroed
+            best_state.edges_left = state.edges_left
+        print(f"{state.num_branches}: zeroed, {state.curr_size}")
+        return
+
+    # Check if its even possible
+    not_considered = ~(state.considered) & state.mask
+    possible = 0
+    while not_considered:
+        curr = (not_considered & -not_considered).bit_length() - 1
+        not_considered &= not_considered - 1
+
+        mask = ~((1 << (curr + 1)) - 1) & state.mask
+
+        # possible += state.nodes[curr].bit_count()
+        
+        possible += (state.nodes[curr] & mask).bit_count()
+       
+    if possible < state.edges_left:
+        print(f"{state.num_branches}: possible, {state.curr_size}")
+        return
+    
+    idx = next_index(state)    
+    if idx == -1:
+        print(f"{state.num_branches}: idx, {state.curr_size}")
+        return
+    
+    # Bound
+    max_edges = (state.nodes[idx] & state.mask).bit_count()
+    if max_edges == 0:
+        print(f"{state.num_branches}: max_edges, {state.curr_size}")
+        return
+    bound =  (state.edges_left + max_edges - 1) // max_edges
+    bound = max(bound, state.min_required)
+    if state.curr_size + bound >= best_state.curr_size:
+        print(f"{state.num_branches}: bound, {state.curr_size}")
+        return
+
+
+    state_copy = copy.deepcopy(state)
+
+    # Include
+    include_node(state, idx, required_edges)
+    simplify(state, required_edges)
+    solve(state, best_state, required_edges)
+
+    # Exclude
+    exclude_node(state_copy, idx)
+    simplify(state_copy, required_edges)
+    solve(state_copy, best_state, required_edges)
+         
 
 
 
 if __name__ == "__main__":
+    n, m = map(int, input().split())
 
-    n, m = list(map(int, input().split()))
-    
-    matrix = np.zeros((n, n))
+    nodes = [0] * n
+    matched = set()
+    required_edges = [0] * n
+    min_required = 0
 
-    # TODO: Use triangular later
     for _ in range(m):
-        row, col = list(map(int, input().split()))
-        matrix[row, col] = 1
-        matrix[col, row] = 1
+        u, v = map(int, input().split())
+        if (nodes[u] & (1 << v)):
+            m -= 1
+            continue
+
+        nodes[u] |= (1 << v)
+        nodes[v] |= (1 << u)
+        if u not in matched and v not in matched:
+            matched.add(u)
+            matched.add(v)
+            required_edges[u] |= (1 << v)
+            required_edges[v] |= (1 << u)
+            min_required += 1
+
+        
+
+    # Make our two states that we need
+    state = State(nodes, m, min_required)
+    best_state = State(nodes[:], m, min_required)
+
+    simplify(best_state, required_edges)
+    approximate(best_state, required_edges)
+
+    print("APPROX:", best_state.curr_size)
+    start = time.time()
+    simplify(state, required_edges)
+    solve(state, best_state, required_edges)
+    end = time.time()
+    print("MIN:", best_state.curr_size)
+    print("TIME:", end - start)
+    print("BRANCHES:", state.num_branches)
+    print(best_state.curr_size)
     
-    # Create initial state
-    state = State(n)
-    state.matrix = matrix
-
-    # Get solution
-    best_guess = approximate(state)
-    solver(state, best_guess)
-
-    print(state.curr_size)
