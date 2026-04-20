@@ -204,12 +204,13 @@ if __name__ == "__main__":
     simplify(best_state, required_edges)
     approximate(best_state, required_edges)
 
-    print("APPROX:", best_state.curr_size)
+    # print("APPROX:", best_state.curr_size)
     start = time.time()
     simplify(state, required_edges)
     solve(state, best_state, required_edges)
     end = time.time()
-    print("MIN:", best_state.curr_size)
-    print("TIME:", end - start)
-    print("BRANCHES:", state.num_branches)
+    # print("MIN:", best_state.curr_size)
+    # print("TIME:", end - start)
+    # print("BRANCHES:", state.num_branches)
+    print(best_state.curr_size)
     
