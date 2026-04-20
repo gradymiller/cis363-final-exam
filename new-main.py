@@ -114,9 +114,6 @@ def simplify(state, required_edges):
                 changes = True
 
 
-    
-
-
 def solve(state, best_state, required_edges):
     state.num_branches += 1
 
@@ -137,18 +134,18 @@ def solve(state, best_state, required_edges):
         curr = (not_considered & -not_considered).bit_length() - 1
         not_considered &= not_considered - 1
 
-        possible += state.nodes[curr].bit_count()
-        #possible += (state.nodes[curr] >> curr).bit_count()
+        mask = ~((1 << (curr + 1)) - 1)
+
+        # possible += state.nodes[curr].bit_count()
         
+        possible += (state.nodes[curr] & mask).bit_count()
+       
     if possible < state.edges_left:
         return
     
-
-
     idx = next_index(state)    
     if idx == -1:
         return
-
     
     # Bound
     max_edges = state.nodes[idx].bit_count()
@@ -185,9 +182,13 @@ if __name__ == "__main__":
 
     for _ in range(m):
         u, v = map(int, input().split())
+        if (nodes[u] & (1 << v)):
+            m -= 1
+            continue
+
         nodes[u] |= (1 << v)
         nodes[v] |= (1 << u)
-        if u not in matched or v not in matched:
+        if u not in matched and v not in matched:
             matched.add(u)
             matched.add(v)
             required_edges[u] |= (1 << v)
@@ -198,10 +199,11 @@ if __name__ == "__main__":
 
     # Make our two states that we need
     state = State(nodes, m, min_required)
-    best_state = copy.deepcopy(state)
+    best_state = State(nodes[:], m, min_required)
 
-    #simplify(best_state, required_edges)
+    simplify(best_state, required_edges)
     approximate(best_state, required_edges)
+
     print("APPROX:", best_state.curr_size)
     start = time.time()
     simplify(state, required_edges)
@@ -209,5 +211,5 @@ if __name__ == "__main__":
     end = time.time()
     print("MIN:", best_state.curr_size)
     print("TIME:", end - start)
-    print("BRANCHES:", best_state.num_branches)
+    print("BRANCHES:", state.num_branches)
     
