@@ -1,7 +1,7 @@
 import time
 
 class State:
-    def __init__(self, nodes, edges_left, min_required):
+    def __init__(self, nodes, edges_left): #, min_required):
         self.nodes = nodes[:]             
         #self.n = len(nodes)
         self.curr_size = 0 # just a normal int
@@ -9,7 +9,7 @@ class State:
         self.zeroed = 0 # bitstring
         self.edges_left = edges_left # int
         self.mask = (1 << len(nodes)) - 1 # 200 bits long
-        self.min_required = min_required
+        #self.min_required = min_required
         self.num_branches = 0
 
     def copy(self):
@@ -21,7 +21,7 @@ class State:
         new_state.zeroed = self.zeroed
         new_state.edges_left = self.edges_left
         new_state.mask = self.mask
-        new_state.min_required = self.min_required
+        #new_state.min_required = self.min_required
         new_state.num_branches = self.num_branches
 
         return new_state
@@ -51,7 +51,7 @@ def next_index(state):
 
     return best_idx
 
-def include_node(state, idx, required_edges):
+def include_node(state, idx): #, required_edges):
 
     # Check if idx is already added to considered
     if (state.considered >> idx) & 1:
@@ -72,8 +72,8 @@ def include_node(state, idx, required_edges):
 
         # Remove node being included from the current neighbor (LSB)
         state.nodes[curr] &= ~(1 << idx)
-        if required_edges[curr] & (1 << idx) != 0:
-            state.min_required -= 1
+        #if required_edges[curr] & (1 << idx) != 0:
+            #state.min_required -= 1
 
         # If that neighbor becomes empty, mark it in zeroed
         if state.nodes[curr] == 0:
@@ -93,9 +93,9 @@ def exclude_node(state, idx):
     while neighbors:
         curr = (neighbors & -neighbors).bit_length() - 1
         neighbors &= neighbors - 1
-        include_node(state, curr, required_edges)  
+        include_node(state, curr) #, required_edges)  
 
-def approximate(state, required_edges):
+def approximate(state): #, required_edges):
     # Runs in place on the state
     while True:
         if state.zeroed == state.mask:
@@ -105,7 +105,7 @@ def approximate(state, required_edges):
         if idx == -1:
             return
 
-        include_node(state, idx, required_edges)
+        include_node(state, idx) #, required_edges)
     
 
 def matching(state):
@@ -133,7 +133,7 @@ def matching(state):
     return min_required
 
 
-def simplify(state, required_edges):
+def simplify(state): #, required_edges):
 
     changes = True
     while changes:
@@ -154,11 +154,11 @@ def simplify(state, required_edges):
             # Include when there is a path
             elif curr_node.bit_count() == 1:
                 state.considered |= (1 << curr)
-                include_node(state, curr_node.bit_length() - 1, required_edges)
+                include_node(state, curr_node.bit_length() - 1) #, required_edges)
                 changes = True
 
 
-def solve(state, best_state, required_edges):
+def solve(state, best_state): #, required_edges):
     state.num_branches += 1
 
     # Return if solved, update if better than best_state
@@ -194,10 +194,8 @@ def solve(state, best_state, required_edges):
     max_edges = (state.nodes[idx] & state.mask).bit_count()
     if max_edges == 0:
         return
-    #bound = (state.edges_left + max_edges - 1) // max_edges
-    bound = max(matching(state), state.min_required)
+    bound = max(max_edges, matching(state))
 
-    #bound = state.min_required
     if state.curr_size + bound >= best_state.curr_size:
         return
 
@@ -205,15 +203,15 @@ def solve(state, best_state, required_edges):
 
     # Include
     state_copy = state.copy()
-    include_node(state_copy, idx, required_edges)
-    simplify(state_copy, required_edges)
-    solve(state_copy, best_state, required_edges)
+    include_node(state_copy, idx) #, required_edges)
+    simplify(state_copy) #, required_edges)
+    solve(state_copy, best_state) #, required_edges)
 
     # Exclude
     state_copy2 = state.copy()
     exclude_node(state_copy2, idx)
-    simplify(state_copy2, required_edges)
-    solve(state_copy2, best_state, required_edges)
+    simplify(state_copy2) #, required_edges)
+    solve(state_copy2, best_state) #, required_edges)
          
 
 
@@ -223,8 +221,8 @@ if __name__ == "__main__":
 
     nodes = [0] * n
     matched = set()
-    required_edges = [0] * n
-    min_required = 0
+    #required_edges = [0] * n
+    #min_required = 0
 
     for _ in range(m):
         u, v = map(int, input().split())
@@ -234,30 +232,30 @@ if __name__ == "__main__":
 
         nodes[u] |= (1 << v)
         nodes[v] |= (1 << u)
-        if u not in matched and v not in matched:
-            matched.add(u)
-            matched.add(v)
-            required_edges[u] |= (1 << v)
-            required_edges[v] |= (1 << u)
-            min_required += 1
+        #if u not in matched and v not in matched:
+            #matched.add(u)
+            #matched.add(v)
+            #required_edges[u] |= (1 << v)
+            #required_edges[v] |= (1 << u)
+            #min_required += 1
 
         
 
     # Make our two states that we need
-    state = State(nodes, m, min_required)
-    best_state = State(nodes[:], m, min_required)
+    state = State(nodes, m) #, min_required)
+    best_state = State(nodes[:], m) #, min_required)
 
-    simplify(best_state, required_edges)
-    approximate(best_state, required_edges)
+    simplify(best_state) #, required_edges)
+    approximate(best_state) #, required_edges)
     #best_state.curr_size = n
 
-    #print("APPROX:", best_state.curr_size)
+    print("APPROX:", best_state.curr_size)
     start = time.time()
-    simplify(state, required_edges)
-    solve(state, best_state, required_edges)
+    simplify(state) #, required_edges)
+    solve(state, best_state) #, required_edges)
     end = time.time()
-    #print("MIN:", best_state.curr_size)
-    #print("TIME:", end - start)
-    #print("BRANCHES:", state.num_branches)
+    print("MIN:", best_state.curr_size)
+    print("TIME:", end - start)
+    print("BRANCHES:", state.num_branches)
     print(best_state.curr_size)
     
