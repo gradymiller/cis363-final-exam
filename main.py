@@ -114,20 +114,32 @@ def matching(state):
 
     remaining = ~state.considered & state.mask
 
-    while remaining:
-        curr = (remaining & -remaining).bit_length() - 1
-        remaining &= remaining - 1
+    while True:
 
-        if (matched >> curr) & 1:
-            continue
+        best = -1
+        best_deg = 10**4
 
-        neighbors = state.nodes[curr] & remaining & ~matched
+        scan = remaining & ~matched
 
-        if neighbors:
-            curr_neighbor = (neighbors & -neighbors).bit_length() - 1
+        while scan:
+            v = (scan & -scan).bit_length() - 1
+            scan &= scan - 1
             
-            matched |= (1 << curr)
-            matched |= (1 << curr_neighbor)
+            deg = (state.nodes[v] & state.mask).bit_count()
+            if deg > 0 and deg < best_deg:
+                best = v
+                best_deg = deg 
+
+        if best == -1:
+            break
+
+        neighbors = state.nodes[best] & remaining & ~matched
+        
+        if neighbors: 
+            u = (neighbors & -neighbors).bit_length() - 1
+
+            matched |= (1 << u)
+            matched |= (1 << best)
             min_required += 1
 
     return min_required
