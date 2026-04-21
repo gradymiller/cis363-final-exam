@@ -82,7 +82,7 @@ def include_node(state, idx, required_edges):
     # Update the state after all neighbors have the included node removed
     state.nodes[idx] = 0
     state.zeroed |= (1 << idx)
-    state.curr_size = state.curr_size + 1
+    state.curr_size += 1
     state.considered = state.considered | (1 << idx)
 
 
@@ -107,6 +107,31 @@ def approximate(state, required_edges):
 
         include_node(state, idx, required_edges)
     
+
+def matching(state):
+    matched = 0
+    min_required = 0
+
+    remaining = ~state.considered & state.mask
+
+    while remaining:
+        curr = (remaining & -remaining).bit_length() - 1
+        remaining &= remaining - 1
+
+        if (matched >> curr) & 1:
+            continue
+
+        neighbors = state.nodes[curr] & remaining & ~matched
+
+        if neighbors:
+            curr_neighbor = (neighbors & -neighbors).bit_length() - 1
+            
+            matched |= (1 << curr)
+            matched |= (1 << curr_neighbor)
+            min_required += 1
+
+    return min_required
+
 
 def simplify(state, required_edges):
 
@@ -169,23 +194,23 @@ def solve(state, best_state, required_edges):
     max_edges = (state.nodes[idx] & state.mask).bit_count()
     if max_edges == 0:
         return
-    #bound =  (state.edges_left + max_edges - 1) // max_edges
-    #bound = max(bound, state.min_required)
+    #bound = (state.edges_left + max_edges - 1) // max_edges
+    bound = max(matching(state), state.min_required)
 
-    bound = state.min_required
+    #bound = state.min_required
     if state.curr_size + bound >= best_state.curr_size:
         return
 
 
-    state_copy = state.copy()
-    state_copy2 = state.copy()
 
     # Include
+    state_copy = state.copy()
     include_node(state_copy, idx, required_edges)
     simplify(state_copy, required_edges)
     solve(state_copy, best_state, required_edges)
 
     # Exclude
+    state_copy2 = state.copy()
     exclude_node(state_copy2, idx)
     simplify(state_copy2, required_edges)
     solve(state_copy2, best_state, required_edges)
