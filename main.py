@@ -1,4 +1,3 @@
-import copy
 import time
 
 class State:
@@ -12,6 +11,20 @@ class State:
         self.mask = (1 << len(nodes)) - 1 # 200 bits long
         self.min_required = min_required
         self.num_branches = 0
+
+    def copy(self):
+        new_state = State.__new__(State)
+
+        new_state.nodes = self.nodes[:]
+        new_state.curr_size = self.curr_size
+        new_state.considered = self.considered
+        new_state.zeroed = self.zeroed
+        new_state.edges_left = self.edges_left
+        new_state.mask = self.mask
+        new_state.min_required = self.min_required
+        new_state.num_branches = self.num_branches
+
+        return new_state
 
 
 def next_index(state):
@@ -153,13 +166,10 @@ def solve(state, best_state, required_edges):
         return
     
     # Bound
-    """
     max_edges = (state.nodes[idx] & state.mask).bit_count()
     if max_edges == 0:
-        print(f"{state.num_branches}: max_edges, {state.curr_size}")
         return
     #bound =  (state.edges_left + max_edges - 1) // max_edges
-    """
     #bound = max(bound, state.min_required)
 
     bound = state.min_required
@@ -167,8 +177,8 @@ def solve(state, best_state, required_edges):
         return
 
 
-    state_copy = copy.deepcopy(state)
-    state_copy2 = copy.deepcopy(state)
+    state_copy = state.copy()
+    state_copy2 = state.copy()
 
     # Include
     include_node(state_copy, idx, required_edges)
@@ -216,13 +226,13 @@ if __name__ == "__main__":
     approximate(best_state, required_edges)
     #best_state.curr_size = n
 
-    print("APPROX:", best_state.curr_size)
+    #print("APPROX:", best_state.curr_size)
     start = time.time()
     simplify(state, required_edges)
     solve(state, best_state, required_edges)
     end = time.time()
-    print("MIN:", best_state.curr_size)
-    print("TIME:", end - start)
-    print("BRANCHES:", state.num_branches)
+    #print("MIN:", best_state.curr_size)
+    #print("TIME:", end - start)
+    #print("BRANCHES:", state.num_branches)
     print(best_state.curr_size)
     
