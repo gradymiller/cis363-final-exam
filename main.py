@@ -114,7 +114,7 @@ def matching(state):
 
     remaining = ~state.considered & state.mask
 
-    while True:
+    while remaining:
 
         best = -1
         best_deg = 10**4
@@ -141,6 +141,8 @@ def matching(state):
             matched |= (1 << u)
             matched |= (1 << best)
             min_required += 1
+
+        remaining &= ~(1 << best)
 
     return min_required
 
