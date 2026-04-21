@@ -9,7 +9,7 @@ class State:
         self.zeroed = 0 # bitstring
         self.edges_left = edges_left # int
         self.mask = (1 << len(nodes)) - 1 # 200 bits long
-        #self.min_required = min_required
+        #self.min_required = )
         self.num_branches = 0
 
     def copy(self):
@@ -21,7 +21,7 @@ class State:
         new_state.zeroed = self.zeroed
         new_state.edges_left = self.edges_left
         new_state.mask = self.mask
-        #new_state.min_required = self.min_required
+        # new_state.min_required = self.min_required
         new_state.num_branches = self.num_branches
 
         return new_state
@@ -208,13 +208,32 @@ def solve(state, best_state): #, required_edges):
     max_edges = (state.nodes[idx] & state.mask).bit_count()
     if max_edges == 0:
         return
-    bound = max(max_edges, matching(state))
+    bound = (state.edges_left + max_edges - 1) // max_edges     
+    # bound = max(bound, state.min_required)
 
     if state.curr_size + bound >= best_state.curr_size:
-        return
+        return 
+    # Only consider stronger matching if:
+    # - cheap bound is weak
+    # - AND we are not already close to a leaf
 
+    remaining_vertices = (~state.considered & state.mask).bit_count()
 
+    # trigger condition for expensive bound
+    should_try_matching = (
+        bound <= 2 and
+        remaining_vertices > 18 and
+        best_state.curr_size - (state.curr_size + bound) <= 4
+    )
 
+    if should_try_matching:
+        lb2 = matching(state)
+
+        # keep best bound
+        bound = max(bound, lb2)
+
+        if state.curr_size + bound >= best_state.curr_size:
+            return    
     # Include
     state_copy = state.copy()
     include_node(state_copy, idx) #, required_edges)
