@@ -111,7 +111,7 @@ def approximate(state): #, required_edges):
         include_node(state, idx) #, required_edges)
     
 
-def matching(state):
+def greedy_matching(state):
     matched = 0
     count = 0
 
