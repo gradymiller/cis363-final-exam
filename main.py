@@ -31,7 +31,6 @@ def next_index(state):
     best_idx = -1
     best_deg = -1
 
-    """
     # nodes not yet decided
     undecided_mask = ~(state.considered) & state.mask
 
@@ -45,15 +44,15 @@ def next_index(state):
 
         # Keep if better
         val = state.degrees[curr]
-        if val > best_val:
-            best_val = val
+        if val > best_deg:
+            best_deg = val
             best_idx = curr
     """
-
     for i, deg in enumerate(state.degrees):
         if deg > best_deg:
             best_deg = deg
             best_idx = i
+    """ 
 
     return best_idx
 
@@ -218,7 +217,7 @@ def get_components(state):
     n = len(state.nodes)
     
     for i in range(n):
-        if (visited >> i) & 1:
+        if (visited >> i) & 1 or ((state.considered & state.mask) >> i) & 1:
             continue
 
         stack = [i]
@@ -253,6 +252,9 @@ def get_components(state):
         components.append(component)
         edges_lefts.append(edges_left // 2)
 
+    if len(components) <= 1:
+        return
+
     component_states = []
     for i in range(len(components)):
         state = State(components[i], edges_lefts[i])
@@ -280,6 +282,7 @@ def solve(state, best_guess):
     max_edges = (state.nodes[idx] & state.mask).bit_count()
     if max_edges == 0:
         return best_guess
+
     max_edge_bound = (state.edges_left + max_edges - 1) // max_edges     
     matching_bound = matching(state)
     #greedy_matching_bound = greedy_matching(state)
@@ -290,26 +293,31 @@ def solve(state, best_guess):
     if state.curr_size + bound >= best_guess:
         return best_guess
     
-    component_states = get_components(state)
+    remaining_vertices = (~state.considered & state.mask).bit_count()
+    component_states = None
+   
+    if remaining_vertices >= 20 and state.edges_left <= remaining_vertices * 3:
+        component_states = get_components(state)
 
-    if len(component_states) > 1:
+    # print(len(component_states))
+    if component_states:
         best = state.curr_size
         for c_state in component_states:
             c_copy = c_state.copy()
-            best_guess = approximate(c_copy)
-            best += solve(c_state, best_guess)
+            c_best_guess = approximate(c_copy)
+            best += solve(c_state, c_best_guess)
         if best < best_guess:
             best_guess = best
 
     else:    
-        # Include
+        # add vertex on one end of edge
         state_copy = state.copy()
         include_node(state_copy, idx)
         solution = solve(state_copy, best_guess)
         if solution < best_guess:
             best_guess = solution
-
-        # Exclude
+        
+        # add vertex on other edge
         exclude_node(state, idx)
         solution = solve(state, best_guess)
         if solution < best_guess:
@@ -350,12 +358,12 @@ if __name__ == "__main__":
     simplify(best_state)
     best_guess = approximate(best_state)
 
-    #print("APPROX:", best_guess)
+    # print("APPROX:", best_guess)
     start = time.time()
     simplify(state)
     best = solve(state, best_guess)
     end = time.time()
-    #print("MIN:", best_guess)
-    #print("TIME:", end - start)
-    #print("BRANCHES:", state.num_branches)
+    # print("MIN:", best_guess)
+    print("TIME:", end - start)
+    # print("BRANCHES:", state.num_branches)
     print(best)
