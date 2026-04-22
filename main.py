@@ -11,6 +11,7 @@ class State:
         self.mask = (1 << len(nodes)) - 1 # 200 bits long
         #self.min_required = )
         self.num_branches = 0
+        self.degrees = [i.bit_count() for i in nodes]
 
     def copy(self):
         new_state = State.__new__(State)
@@ -23,7 +24,7 @@ class State:
         new_state.mask = self.mask
         # new_state.min_required = self.min_required
         new_state.num_branches = self.num_branches
-
+        new_state.degrees = self.degrees[:]
         return new_state
 
 
@@ -44,7 +45,7 @@ def next_index(state):
 
         # Keep if better
         #val = state.nodes[curr].bit_count()
-        val = ((state.nodes[curr] & ~state.considered) & state.mask).bit_count()
+        val = state.degrees[curr]
         if val > best_val:
             best_val = val
             best_idx = curr
@@ -72,6 +73,7 @@ def include_node(state, idx): #, required_edges):
 
         # Remove node being included from the current neighbor (LSB)
         state.nodes[curr] &= ~(1 << idx)
+        state.degrees[curr] -= 1
         #if required_edges[curr] & (1 << idx) != 0:
             #state.min_required -= 1
 
@@ -81,6 +83,7 @@ def include_node(state, idx): #, required_edges):
 
     # Update the state after all neighbors have the included node removed
     state.nodes[idx] = 0
+    state.degrees[idx] = 0
     state.zeroed |= (1 << idx)
     state.curr_size += 1
     state.considered = state.considered | (1 << idx)
@@ -110,42 +113,51 @@ def approximate(state): #, required_edges):
 
 def matching(state):
     matched = 0
-    min_required = 0
+    count = 0
 
     remaining = ~state.considered & state.mask
+    candidates = remaining
 
-    while remaining:
+    while candidates:
 
         best = -1
-        best_deg = 10**4
+        best_deg = 10**9
 
-        scan = remaining & ~matched
+        scan = candidates
 
         while scan:
             v = (scan & -scan).bit_length() - 1
             scan &= scan - 1
-            
-            deg = (state.nodes[v] & state.mask).bit_count()
-            if deg > 0 and deg < best_deg:
+
+            if (matched >> v) & 1:
+                continue
+
+            deg = state.degrees[v]
+
+            if deg == 1:
                 best = v
-                best_deg = deg 
+                best_deg = 1
+                break
+
+            if deg < best_deg:
+                best = v
+                best_deg = deg
 
         if best == -1:
             break
 
         neighbors = state.nodes[best] & remaining & ~matched
-        
-        if neighbors: 
+
+        if neighbors:
             u = (neighbors & -neighbors).bit_length() - 1
 
             matched |= (1 << u)
             matched |= (1 << best)
-            min_required += 1
+            count += 1
 
-        remaining &= ~(1 << best)
+        candidates &= ~(1 << best)
 
-    return min_required
-
+    return count
 
 def simplify(state): #, required_edges):
 
@@ -157,16 +169,16 @@ def simplify(state): #, required_edges):
             curr = (not_considered & -not_considered).bit_length() - 1
             not_considered &= not_considered - 1
 
+            curr_deg = state.degrees[curr]
             curr_node = state.nodes[curr] & state.mask
 
-
             # Remove nodes with degree zero
-            if curr_node == 0:
+            if curr_deg == 0:
                 exclude_node(state, curr)
                 changes = True
 
             # Include when there is a path
-            elif curr_node.bit_count() == 1:
+            elif curr_deg == 1:
                 state.considered |= (1 << curr)
                 include_node(state, curr_node.bit_length() - 1) #, required_edges)
                 changes = True
@@ -213,6 +225,7 @@ def solve(state, best_state): #, required_edges):
 
     if state.curr_size + bound >= best_state.curr_size:
         return 
+
     # Only consider stronger matching if:
     # - cheap bound is weak
     # - AND we are not already close to a leaf
@@ -234,6 +247,7 @@ def solve(state, best_state): #, required_edges):
 
         if state.curr_size + bound >= best_state.curr_size:
             return    
+    
     # Include
     state_copy = state.copy()
     include_node(state_copy, idx) #, required_edges)
@@ -282,13 +296,12 @@ if __name__ == "__main__":
     approximate(best_state) #, required_edges)
     #best_state.curr_size = n
 
-    print("APPROX:", best_state.curr_size)
+    # print("APPROX:", best_state.curr_size)
     start = time.time()
     simplify(state) #, required_edges)
     solve(state, best_state) #, required_edges)
     end = time.time()
-    print("MIN:", best_state.curr_size)
+    # print("MIN:", best_state.curr_size)
     print("TIME:", end - start)
-    print("BRANCHES:", state.num_branches)
+    # print("BRANCHES:", state.num_branches)
     print(best_state.curr_size)
-    
