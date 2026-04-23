@@ -304,8 +304,13 @@ def solve(state, best_guess):
         best = state.curr_size
         for c_state in component_states:
             c_copy = c_state.copy()
+<<<<<<< HEAD
             c_best_guess = approximate(c_copy)
             best += solve(c_state, c_best_guess)
+=======
+            #c_best_guess = approximate(c_copy)
+            best += solve(c_state, len(c_state.nodes))
+>>>>>>> ee22ad5 (BUG fixes)
         if best < best_guess:
             best_guess = best
 
