@@ -117,6 +117,74 @@ def approximate(state):
     return state.curr_size
     
 
+def get_aps(state):
+    n = len(state.nodes)
+    adj = state.nodes
+
+    disc = [-1] * n
+    low = [-1] * n
+    parent = [-1] * n
+    children_count = [0] * n
+
+    visited = 0
+    ap = 0
+    time = 0
+
+    for start in range(n):
+        if visited & (1 << start):
+            continue
+
+        stack = [(start, adj[start], 0)]
+
+        while stack:
+            u, neighbors, state_flag = stack.pop()
+
+            if state_flag == 0:
+
+                # mark visited and initialize DFS time
+                if not (visited & (1 << u)):
+                    visited |= (1 << u)
+                    time += 1
+                    disc[u] = low[u] = time
+
+                # process neighbors
+                if neighbors:
+                    v_bit = neighbors & -neighbors
+                    v = v_bit.bit_length() - 1
+                    neighbors &= neighbors - 1
+
+                    # reprocess current node later
+                    stack.append((u, neighbors, 0))
+
+                    if not (visited & (1 << v)):
+                        parent[v] = u
+                        children_count[u] += 1
+                        stack.append((v, adj[v], 0))
+
+                    elif v != parent[u]:
+                        low[u] = min(low[u], disc[v])
+
+                else:
+                    stack.append((u, 0, 1))
+
+            else:
+                p = parent[u]
+
+                if p != -1:
+                    low[p] = min(low[p], low[u])
+
+                    # articulation condition (non-root)
+                    if parent[p] != -1 and low[u] >= disc[p]:
+                        ap |= (1 << p)
+
+                else:
+                    # root case
+                    if children_count[u] > 1:
+                        ap |= (1 << u)
+
+    return ap
+
+
 def matching(state):   
     matched = 0        
     min_required = 0   
@@ -215,21 +283,22 @@ def get_components(state):
     edges_lefts = []
     visited = 0
     n = len(state.nodes)
-    
+
+    active_mask = ~state.considered & state.mask
+
     for i in range(n):
-        if (visited >> i) & 1 or ((state.considered & state.mask) >> i) & 1:
+        if (visited >> i) & 1 or not ((active_mask >> i) & 1):
             continue
 
         stack = [i]
         nodes = []
-
         visited |= (1 << i)
 
         while stack:
             v = stack.pop()
             nodes.append(v)
 
-            neighbors = state.nodes[v]
+            neighbors = state.nodes[v] & active_mask
 
             while neighbors:
                 curr = (neighbors & -neighbors).bit_length() - 1
@@ -241,29 +310,32 @@ def get_components(state):
 
         component = []
         edges_left = 0
-        for node in nodes: 
+
+        component_mask = 0
+        for node in nodes:
+            component_mask |= (1 << node)
+
+        for node in nodes:
             bits = 0
-            for i, node2 in enumerate(nodes):
-                if (1 << node2) & state.nodes[node]:
-                    bits |= (1 << i)
+            for j, node2 in enumerate(nodes):
+                if (state.nodes[node] & component_mask) & (1 << node2):
+                    bits |= (1 << j)
                     edges_left += 1
 
             component.append(bits)
+
         components.append(component)
         edges_lefts.append(edges_left // 2)
 
-    if len(components) <= 1:
-        return
-
     component_states = []
     for i in range(len(components)):
-        state = State(components[i], edges_lefts[i])
-        component_states.append(state)
+        new_state = State(components[i], edges_lefts[i])
+        component_states.append(new_state)
 
     return component_states
 
 
-def solve(state, best_guess):
+def solve(state, best_guess, aps):
     state.num_branches += 1
 
     simplify(state)
@@ -293,24 +365,23 @@ def solve(state, best_guess):
     if state.curr_size + bound >= best_guess:
         return best_guess
     
-    remaining_vertices = (~state.considered & state.mask).bit_count()
-    component_states = None
-   
-    if remaining_vertices >= 20 and state.edges_left <= remaining_vertices * 3:
+    if state.num_branches % 5 == 0:
+        aps = get_aps(state)
+    
+    component_states = []
+    if (aps >> idx) & 1:
         component_states = get_components(state)
+        print("APS:", (aps >> idx) & 1)
+        for s in component_states:
+            print("SUBGRAPH:", s.nodes)
 
-    # print(len(component_states))
-    if component_states:
+    #print(len(component_states))
+    if len(component_states) > 1:
         best = state.curr_size
         for c_state in component_states:
             c_copy = c_state.copy()
-<<<<<<< HEAD
             c_best_guess = approximate(c_copy)
-            best += solve(c_state, c_best_guess)
-=======
-            #c_best_guess = approximate(c_copy)
-            best += solve(c_state, len(c_state.nodes))
->>>>>>> ee22ad5 (BUG fixes)
+            best += solve(c_state, c_best_guess, aps)
         if best < best_guess:
             best_guess = best
 
@@ -318,13 +389,13 @@ def solve(state, best_guess):
         # add vertex on one end of edge
         state_copy = state.copy()
         include_node(state_copy, idx)
-        solution = solve(state_copy, best_guess)
+        solution = solve(state_copy, best_guess, aps)
         if solution < best_guess:
             best_guess = solution
         
         # add vertex on other edge
         exclude_node(state, idx)
-        solution = solve(state, best_guess)
+        solution = solve(state, best_guess, aps)
         if solution < best_guess:
             best_guess = solution
 
@@ -354,21 +425,21 @@ if __name__ == "__main__":
             #required_edges[v] |= (1 << u)
             #min_required += 1
 
-        
+    
 
     # Make our two states that we need
     state = State(nodes, m)
     best_state = State(nodes[:], m)
+    aps = get_aps(state)
 
     simplify(best_state)
     best_guess = approximate(best_state)
 
-    # print("APPROX:", best_guess)
+    print("APPROX:", best_guess)
     start = time.time()
     simplify(state)
-    best = solve(state, best_guess)
+    best = solve(state, best_guess, aps)
     end = time.time()
-    # print("MIN:", best_guess)
     print("TIME:", end - start)
-    # print("BRANCHES:", state.num_branches)
+    print("BRANCHES:", state.num_branches)
     print(best)
