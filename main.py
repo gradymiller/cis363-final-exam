@@ -365,15 +365,12 @@ def solve(state, best_guess, aps):
     if state.curr_size + bound >= best_guess:
         return best_guess
     
-    if state.num_branches % 5 == 0:
-        aps = get_aps(state)
+    #if state.num_branches % 5 == 0:
+        #aps = get_aps(state)
     
     component_states = []
     if (aps >> idx) & 1:
         component_states = get_components(state)
-        print("APS:", (aps >> idx) & 1)
-        for s in component_states:
-            print("SUBGRAPH:", s.nodes)
 
     #print(len(component_states))
     if len(component_states) > 1:
@@ -435,11 +432,11 @@ if __name__ == "__main__":
     simplify(best_state)
     best_guess = approximate(best_state)
 
-    print("APPROX:", best_guess)
+    #print("APPROX:", best_guess)
     start = time.time()
     simplify(state)
     best = solve(state, best_guess, aps)
     end = time.time()
-    print("TIME:", end - start)
-    print("BRANCHES:", state.num_branches)
+    #print("TIME:", end - start)
+    #print("BRANCHES:", state.num_branches)
     print(best)
