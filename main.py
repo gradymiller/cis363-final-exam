@@ -1,4 +1,5 @@
 import time
+import sys
 
 class State:
     def __init__(self, nodes, edges_left):
@@ -27,12 +28,17 @@ class State:
         return new_state
 
 
-def next_index(state):
+def next_index(state, aps):
     best_idx = -1
     best_deg = -1
 
     # nodes not yet decided
     undecided_mask = ~(state.considered) & state.mask
+
+    flag = False
+    if undecided_mask & aps:
+        undecided_mask &= aps
+        flag = True
 
     while undecided_mask:
 
@@ -54,7 +60,7 @@ def next_index(state):
             best_idx = i
     """ 
 
-    return best_idx
+    return best_idx, flag
 
 def include_node(state, idx):
 
@@ -109,7 +115,7 @@ def approximate(state):
         if state.zeroed == state.mask:
             return state.curr_size
 
-        idx = next_index(state)
+        idx, flag = next_index(state, aps)
         if idx == -1:
             break
 
@@ -346,7 +352,7 @@ def solve(state, best_guess, aps):
             best_guess = state.curr_size
         return best_guess
 
-    idx = next_index(state)    
+    idx, flag = next_index(state, aps)
     if idx == -1:
         return best_guess
     
@@ -364,54 +370,72 @@ def solve(state, best_guess, aps):
 
     if state.curr_size + bound >= best_guess:
         return best_guess
-    
-    #if state.num_branches % 5 == 0:
-        #aps = get_aps(state)
-    
-    component_states = []
-    if (aps >> idx) & 1:
-        component_states = get_components(state)
 
-    #print(len(component_states))
-    if len(component_states) > 1:
-        best = state.curr_size
-        for c_state in component_states:
-            c_copy = c_state.copy()
-            c_best_guess = approximate(c_copy)
-            best += solve(c_state, c_best_guess, aps)
-        if best < best_guess:
-            best_guess = best
+    #if state.num_branches < 20:
+    if flag:
+        aps &= ~(1 << idx)
 
-    else:    
-        # add vertex on one end of edge
-        state_copy = state.copy()
-        include_node(state_copy, idx)
-        solution = solve(state_copy, best_guess, aps)
-        if solution < best_guess:
-            best_guess = solution
-        
-        # add vertex on other edge
-        exclude_node(state, idx)
-        solution = solve(state, best_guess, aps)
-        if solution < best_guess:
-            best_guess = solution
+    avg_degree = state.edges_left // ~state.considered.bit_count()
+
+    if not aps and state.num_branches < 10 and avg_degree < 3 and ~state.considered.bit_count() > 20: 
+        aps = get_aps(state)
+
+    state_copy = state.copy()
+
+    # INCLUDE
+    include_node(state_copy, idx)
+    if aps & (1 << idx):
+        include_solution = solve_components(state_copy, aps)
+    else:
+        include_solution = solve(state_copy, best_guess, aps)
+
+    if include_solution < best_guess:
+        best_guess = include_solution
+    
+    # EXCLUDE
+    exclude_node(state, idx)
+    if aps & (1 << idx):
+        exclude_solution = solve_components(state, aps)
+    else:
+        exclude_solution = solve(state, best_guess, aps)
+
+    if exclude_solution < best_guess:
+        best_guess = exclude_solution
 
     return best_guess
          
+def solve_components(state, aps):
+    total = state.curr_size
+    component_states = get_components(state)
+    for c in component_states:
+        print(f"{state.num_branches}: {c.nodes}")
+    
+    for c_state in component_states:
+        c_copy = c_state.copy()
+        c_best_guess = approximate(c_copy)
+        total += solve(c_state, c_best_guess, aps)
+    
+    return total
+
 
 if __name__ == "__main__":
-    n, m = map(int, input().split())
+    data = sys.stdin.read().split()
+    n = int(data[0])
+    m = int(data[1])
 
     nodes = [0] * n
     matched = set()
     #required_edges = [0] * n
     #min_required = 0
 
+    idx = 2
     for _ in range(m):
-        u, v = map(int, input().split())
+        u = int(data[idx])
+        v = int(data[idx+1])
         if (nodes[u] & (1 << v)):
             m -= 1
             continue
+        idx += 2
 
         nodes[u] |= (1 << v)
         nodes[v] |= (1 << u)
@@ -427,7 +451,11 @@ if __name__ == "__main__":
     # Make our two states that we need
     state = State(nodes, m)
     best_state = State(nodes[:], m)
-    aps = get_aps(state)
+    avg_degree = state.edges_left // ~state.considered.bit_count()
+    if avg_degree < 5:
+        aps = get_aps(state)
+    else:
+        aps = 0
 
     simplify(best_state)
     best_guess = approximate(best_state)
