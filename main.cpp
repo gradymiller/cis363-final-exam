@@ -79,6 +79,61 @@ int matching(const std::vector<std::bitset<200>>& nodes, const std::bitset<200>&
 	return min_required;
 }
 
+
+int greedy_matching(const std::vector<std::bitset<200>>& nodes, const std::bitset<200>& remaining) {
+	std::bitset<200> matched = 0;
+	int min_required = 0;
+	std::bitset<200> tmp_remaining = remaining;
+	std::bitset<200> candidates = tmp_remaining;
+
+	while (candidates.any()) {
+		int best = -1;
+		int deg;
+		int best_deg = nodes.size();
+		std::bitset<200> scan = candidates;
+
+		while (scan.any()) {
+			size_t curr = scan._Find_first();
+			scan.reset(curr);
+
+			if (matched.test(curr)) continue;
+
+			deg = (nodes[curr] & tmp_remaining).count();
+
+			if (deg == 1) {
+				best = curr;
+				best_deg = 1;
+				break;
+			}
+
+			if (deg < best_deg) {
+				best = curr;
+				best_deg = deg;
+			}
+		}
+
+		if (best == -1) break;
+
+		candidates.reset(best);
+
+		std::bitset<200> neighbors = nodes[best] & tmp_remaining & ~matched;
+
+		if (neighbors.any()) {
+			int u = neighbors._Find_first();
+			matched.set(u);
+			matched.set(best);
+			min_required += 1;
+
+			candidates.reset(u);
+			tmp_remaining.reset(best);
+			tmp_remaining.reset(u);
+		} else {
+			tmp_remaining.reset(best);
+		}
+	}
+	return min_required;
+}
+
 std::pair<std::bitset<200>, int> simplify(const std::vector<std::bitset<200>>& nodes, const std::bitset<200>& remaining) {
 	bool changes = true;
 	std::bitset<200> tmp_remaining = remaining;
@@ -121,7 +176,7 @@ void solve(const std::vector<std::bitset<200>>& nodes, int& best_size, std::bits
 
 	curr_size += added;
 
-	if (curr_size + matching(nodes, remaining) >= best_size) return;
+	if (curr_size + greedy_matching(nodes, remaining) >= best_size) return;
 
 	if (remaining.none()) {
 		best_size = std::min(best_size, curr_size);

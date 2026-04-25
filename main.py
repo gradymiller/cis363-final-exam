@@ -64,6 +64,53 @@ def matching(remaining):
     return min_required         
 
 
+def greedy_matching(remaining):
+    global NODES
+    matched = 0
+    min_required = 0
+    tmp_remaining = remaining
+    candidates = remaining
+
+    while candidates:
+        best = -1
+        best_deg = len(NODES)
+        scan = candidates
+
+        while scan:
+            curr = (scan & -scan).bit_length() - 1
+            scan &= scan - 1
+
+            if (matched >> curr) & 1:
+                continue
+
+            deg = NODES[curr] & tmp_remaining
+
+            if deg == 1:
+                best = curr
+                best_deg = 1
+                break
+
+            if deg < best_deg:
+                best = curr
+                best_deg = deg
+
+        if best == -1:
+            break
+
+        neighbors = NODES[best] & tmp_remaining & ~matched
+
+        if neighbors:
+            u = (neighbors & -neighbors).bit_length() - 1
+            matched |= (1 << u)
+            matched |= (1 << best)
+            min_required += 1
+
+        candidates &= ~(1 << best)
+
+    return min_required
+
+
+
 def simplify(remaining):
     global BEST_SIZE
     global NODES
@@ -109,7 +156,7 @@ def solve(remaining, curr_size):
     curr_size += added
 
     # Bound
-    if curr_size + matching(remaining) >= BEST_SIZE:
+    if curr_size + greedy_matching(remaining) >= BEST_SIZE:
         return 
 
     # Check if solved and better than current best
