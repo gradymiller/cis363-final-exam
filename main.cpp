@@ -3,78 +3,74 @@
 #include <bitset>
 #include <bit>
 #include <algorithm>
-
-// GLOBAL VARS
-int N;
-int M;
-std::vector NODES;
-int BEST_SIZE;
+#include <utility>
 
 
-int next_index(remaining) {
+int next_index(const std::vector<std::bitset<200>>& nodes, const std::bitset<200>& remaining) {
 	int best_idx = -1;
 	int best_val = -1;
-	std::bitset<N> tmp_remaining = remaining;
+	std::bitset<200> tmp_remaining = remaining;
 
-	int curr;
+	size_t curr;
 	int val;
-	while (tmp_remaining):
-		curr = std::countr_zero(tmp_remaining);
-		tmp_remaining &= (tmp_remaining - 1);
+	while (tmp_remaining.any()) {
+		curr = tmp_remaining._Find_first();
+		tmp_remaining.reset(curr);
 
-		val = std::popcount(NODES[curr] & remaining);
-		if (val > best_val):
+		val = (nodes[curr] & remaining).count();
+		if (val > best_val) {
 			best_val = val;
 			best_idx = curr;
-
+		}
+	}
 	return best_idx;
 }
 
-void approximate(remaining, curr_size){
-	std::bitset<N> tmp_remaining = remaining;
-	int tmp_curr_size = curr_sizes;
+void approximate(const std::vector<std::bitset<200>>& nodes, int& best_size, const std::bitset<200>& remaining, const int& curr_size) {
+	std::bitset<200> tmp_remaining = remaining;
+	int tmp_curr_size = curr_size;
 
 	int u;
 	int v;
-	std::bitset<N> neighbors;
-	while (tmp_remaining) {
-		u = std::countr_zero(tmp_remaining);
+	std::bitset<200> neighbors;
+	while (tmp_remaining.any()) {
+		u = tmp_remaining._Find_first();
 
-		neighbors = NODES[u] & tmp_remaining;
-		if (!neighbors) {
+		neighbors = nodes[u] & tmp_remaining;
+		if (neighbors.none()) {
 			tmp_remaining.reset(u);
 			tmp_curr_size++;
 		} else {
-			v = std::countr_zero(neighbors);
+			v = neighbors._Find_first();
 			tmp_remaining.reset(u);
 			tmp_remaining.reset(v);
 			tmp_curr_size += 2;
 		}
 			
 	}
-	BEST_SIZE = std::min(BEST_SIZE, tmp_curr_size);
+	best_size = std::min(best_size, tmp_curr_size);
 }
 
-int matching(remaining) {
-	std:bitset<N> matched;
-	int min_required;
-	std::bitset<N> tmp_remaining = remaining;
+int matching(const std::vector<std::bitset<200>>& nodes, const std::bitset<200>& remaining) {
+	std::bitset<200> matched;
+	int min_required = 0;
+	std::bitset<200> tmp_remaining = remaining;
 
 	int curr;
 	int curr_neighbor;
-	std::bitset<N> neighbors;
-	while (tmp_remaining) {
-		curr = std::countr_zero(tmp_remaining);
-		tmp_remaining &= (remaining - 1);
+	std::bitset<200> neighbors;
+	while (tmp_remaining.any()) {
+		curr = tmp_remaining._Find_first();
+		tmp_remaining.reset(curr);
 
 		if (matched.test(curr)) {
 			continue;
 		}
 
-		neighbors = NODES[curr] & remaining & ~matched;
+		neighbors = nodes[curr] & remaining & ~matched;
 
-		if (neighbors) {
-			curr_neighbor = std::countr_zero(neighbors);
+		if (neighbors.any()) {
+			curr_neighbor = neighbors._Find_first();
 			matched.set(curr);
 			matched.set(curr_neighbor);
 			min_required += 1;
@@ -83,16 +79,88 @@ int matching(remaining) {
 	return min_required;
 }
 
+std::pair<std::bitset<200>, int> simplify(const std::vector<std::bitset<200>>& nodes, const std::bitset<200>& remaining) {
+	bool changes = true;
+	std::bitset<200> tmp_remaining = remaining;
+	int added = 0;
+
+	while (changes) {
+		changes = false;
+		std::bitset<200> scan = tmp_remaining;
+		
+		int curr;
+		int curr_deg;
+		while (scan.any()) {
+			curr = scan._Find_first();
+			scan.reset(curr);
+
+			curr_deg = (nodes[curr] & tmp_remaining).count();
+
+			if (curr_deg == 0) {
+				tmp_remaining.reset(curr);
+			} else if (curr_deg == 1) {
+				std::bitset<200> neighbors = nodes[curr] & tmp_remaining;
+				tmp_remaining.reset(neighbors._Find_first());
+				tmp_remaining.reset(curr);
+				added++;
+				changes = true;
+				break;
+			}
+		}
+	}
+	return std::pair(tmp_remaining, added);
+}
+
+void solve(const std::vector<std::bitset<200>>& nodes, int& best_size, std::bitset<200> remaining, int curr_size) {
+	if (curr_size >= best_size) return;
+
+	int added;
+	auto p = simplify(nodes, remaining);
+	remaining = p.first;
+	added = p.second;
+
+	curr_size += added;
+
+	if (curr_size + matching(nodes, remaining) >= best_size) return;
+
+	if (remaining.none()) {
+		best_size = std::min(best_size, curr_size);
+		return;
+	}
+
+	int idx = next_index(nodes, remaining);
+	if (idx == -1) {
+		best_size = std::min(best_size, curr_size);
+		return;
+	}
+
+	solve(nodes, best_size, remaining.reset(idx), curr_size + 1);
+
+	std::bitset<200> neighbors = nodes[idx] & remaining;
+	solve(nodes, best_size, remaining.reset(idx) & ~neighbors, curr_size + neighbors.count());
+}
 
 int main() {
-	// Read in data
+	int n, m;
+	std::cin >> n >> m;
+	std::vector<std::bitset<200>> nodes(n);
+
+	int u;
+	int v;
+	for (int i = 0; i < m; i++) {
+		std::cin >>	u >> v;
+		nodes[u].set(v);
+		nodes[v].set(u);
+	}
 	
-	std::bitset<N> initial;
-	initial.set();
+	std::bitset<200> initial;
+	for (int i = 0; i < n; i++) initial.set(i);
 
-	BEST_SIZE = N;
-	approximate(initial, 0);
+	int best_size = n;
+	approximate(nodes, best_size, initial, 0);
 
-	solve(initial, 0);
-	std::cout << BEST_SIZE;
+	solve(nodes, best_size, initial, 0);
+	std::cout << best_size;
+	
+	return 0;
 }
