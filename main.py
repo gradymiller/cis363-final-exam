@@ -1,7 +1,5 @@
 import time
 import sys
-sys.setrecursionlimit(2000)
-
 
 def next_index(remaining):
     global NODES
@@ -103,8 +101,8 @@ def solve(remaining, curr_size):
         return
 
     # Handle the degree <= 1 nodes
-    remaining, added = simplify(remaining)
-    curr_size += added
+    #remaining, added = simplify(remaining)
+    #curr_size += added
 
     # Bound
     if curr_size + matching(remaining) >= BEST_SIZE:
@@ -126,6 +124,17 @@ def solve(remaining, curr_size):
     # Exclude, and include all neighbors of idx
     neighbors = NODES[idx] & remaining
     solve(remaining & ~(1 << idx) & ~neighbors, curr_size + neighbors.bit_count())
+
+
+def set_degrees(nodes):
+    deg_vals = [0] * len(node)
+    degrees = [0] * len(node)
+    for idx, node in enumerate(nodes):
+        deg = node.bit_count()         
+        deg_vals[deg] &= (1 << idx)
+        degrees[idx] = deg
+
+    return deg_vals, degrees
          
 
 if __name__ == "__main__":
@@ -148,9 +157,10 @@ if __name__ == "__main__":
     initial = (1 << N) - 1 
     BEST_SIZE = N
     
-    #approximate(initial, 0)
+    initial, added = simplify(initial)
+    approximate(initial, added)
     start = time.time()
-    solve(initial, 0)
+    solve(initial, added)
     end = time.time()
     #print("Time:", end - start)
     print(BEST_SIZE)
