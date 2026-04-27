@@ -176,7 +176,7 @@ void solve(const std::vector<std::bitset<200>>& nodes, int& best_size, std::bits
 
 	curr_size += added;
 
-	if (curr_size + greedy_matching(nodes, remaining) >= best_size) return;
+	if (curr_size + matching(nodes, remaining) >= best_size) return;
 
 	if (remaining.none()) {
 		best_size = std::min(best_size, curr_size);

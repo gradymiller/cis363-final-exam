@@ -20,7 +20,7 @@ def next_index(remaining):
 
     return best_idx
 
-
+"""
 def approximate(remaining, curr_size):
     global BEST_SIZE
     tmp_remaining = remaining
@@ -38,6 +38,7 @@ def approximate(remaining, curr_size):
 
         tmp_remaining &= ~(1 << idx)
         tmp_curr_size += 1
+"""
     
 
 def matching(remaining):   
@@ -63,6 +64,7 @@ def matching(remaining):
                        
     return min_required         
 
+"""
 def simplify(remaining):
     global BEST_SIZE
     global NODES
@@ -94,6 +96,7 @@ def simplify(remaining):
                 break
 
     return tmp_remaining, added
+"""
 
 def solve(remaining, curr_size):
     global BEST_SIZE
@@ -103,8 +106,8 @@ def solve(remaining, curr_size):
         return
 
     # Handle the degree <= 1 nodes
-    remaining, added = simplify(remaining)
-    curr_size += added
+    #remaining, added = simplify(remaining)
+    #curr_size += added
 
     # Bound
     if curr_size + matching(remaining) >= BEST_SIZE:
@@ -126,9 +129,10 @@ def solve(remaining, curr_size):
     # Exclude, and include all neighbors of idx
     neighbors = NODES[idx] & remaining
     solve(remaining & ~(1 << idx) & ~neighbors, curr_size + neighbors.bit_count())
-         
 
-if __name__ == "__main__":
+def main():
+    global NODES
+    global BEST_SIZE
     data = sys.stdin.read().split()
     N = int(data[0])
     M = int(data[1])
@@ -149,9 +153,14 @@ if __name__ == "__main__":
     BEST_SIZE = N
     
     #approximate(initial, 0)
-    start = time.time()
+    #start = time.time()
     solve(initial, 0)
-    end = time.time()
+    #end = time.time()
     #print("Time:", end - start)
-    print(BEST_SIZE)
+    #print(BEST_SIZE)
 
+
+if __name__ == "__main__":
+    NODES = []
+    BEST_SIZE = 0
+    main()
