@@ -4,7 +4,7 @@
 #include <bit>
 #include <algorithm>
 #include <utility>
-
+#include <chrono>
 
 int next_index(const std::vector<std::bitset<200>>& nodes, const std::bitset<200>& remaining) {
 	int best_idx = -1;
@@ -79,61 +79,6 @@ int matching(const std::vector<std::bitset<200>>& nodes, const std::bitset<200>&
 	return min_required;
 }
 
-
-int greedy_matching(const std::vector<std::bitset<200>>& nodes, const std::bitset<200>& remaining) {
-	std::bitset<200> matched = 0;
-	int min_required = 0;
-	std::bitset<200> tmp_remaining = remaining;
-	std::bitset<200> candidates = tmp_remaining;
-
-	while (candidates.any()) {
-		int best = -1;
-		int deg;
-		int best_deg = nodes.size();
-		std::bitset<200> scan = candidates;
-
-		while (scan.any()) {
-			size_t curr = scan._Find_first();
-			scan.reset(curr);
-
-			if (matched.test(curr)) continue;
-
-			deg = (nodes[curr] & tmp_remaining).count();
-
-			if (deg == 1) {
-				best = curr;
-				best_deg = 1;
-				break;
-			}
-
-			if (deg < best_deg) {
-				best = curr;
-				best_deg = deg;
-			}
-		}
-
-		if (best == -1) break;
-
-		candidates.reset(best);
-
-		std::bitset<200> neighbors = nodes[best] & tmp_remaining & ~matched;
-
-		if (neighbors.any()) {
-			int u = neighbors._Find_first();
-			matched.set(u);
-			matched.set(best);
-			min_required += 1;
-
-			candidates.reset(u);
-			tmp_remaining.reset(best);
-			tmp_remaining.reset(u);
-		} else {
-			tmp_remaining.reset(best);
-		}
-	}
-	return min_required;
-}
-
 std::pair<std::bitset<200>, int> simplify(const std::vector<std::bitset<200>>& nodes, const std::bitset<200>& remaining) {
 	bool changes = true;
 	std::bitset<200> tmp_remaining = remaining;
@@ -149,18 +94,31 @@ std::pair<std::bitset<200>, int> simplify(const std::vector<std::bitset<200>>& n
 			curr = scan._Find_first();
 			scan.reset(curr);
 
-			curr_deg = (nodes[curr] & tmp_remaining).count();
+			std::bitset<200> neighbors = nodes[curr] & tmp_remaining;
+			curr_deg = neighbors.count();
 
 			if (curr_deg == 0) {
 				tmp_remaining.reset(curr);
 			} else if (curr_deg == 1) {
-				std::bitset<200> neighbors = nodes[curr] & tmp_remaining;
 				tmp_remaining.reset(neighbors._Find_first());
 				tmp_remaining.reset(curr);
 				added++;
 				changes = true;
 				break;
+			} else if (curr_deg == 2) {
+				size_t neighbor1 = neighbors._Find_first();
+				size_t neighbor2 = neighbors._Find_next(neighbor1);
+
+				if (nodes[neighbor1].test(neighbor2)) {
+					tmp_remaining.reset(neighbor1);
+					tmp_remaining.reset(neighbor2);
+
+					added += 2;
+					changes = true;
+					break;
+				}
 			}
+
 		}
 	}
 	return std::pair(tmp_remaining, added);
@@ -169,12 +127,13 @@ std::pair<std::bitset<200>, int> simplify(const std::vector<std::bitset<200>>& n
 void solve(const std::vector<std::bitset<200>>& nodes, int& best_size, std::bitset<200> remaining, int curr_size) {
 	if (curr_size >= best_size) return;
 
-	// int added;
-    // auto p = simplify(nodes, remaining);
-	// remaining = p.first;
-	// added = p.second;
-
-	// curr_size += added;
+	/*
+	int added;
+	auto p = simplify(nodes, remaining);
+	remaining = p.first;
+	added = p.second;
+	curr_size += added;
+	*/
 
 	if (curr_size + matching(nodes, remaining) >= best_size) return;
 
@@ -212,10 +171,13 @@ int main() {
 	for (int i = 0; i < n; i++) initial.set(i);
 
 	int best_size = n;
-	auto [intial, added] = simplify(nodes, initial);
-    approximate(nodes, best_size, initial, added);
+	auto [remaining, added] = simplify(nodes, initial);
+	approximate(nodes, best_size, remaining, added);
 
-	solve(nodes, best_size, initial, added);
+	auto start = std::chrono::steady_clock::now();
+	solve(nodes, best_size, remaining, added);
+	auto end = std::chrono::steady_clock::now();
+	
 	std::cout << best_size;
 	
 	return 0;
