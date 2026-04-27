@@ -1,0 +1,9 @@
+1. Heap for next_index instead of n^2, or sorted list, or heap+hashtable of
+removed
+2. Keep a degree list that is global (per class instance)
+3. Convert solve to stack instead of recursion
+4. add some evaluating logic up front to split a large graph into components to
+solv each piece
+- Check for disconnected components 
+- Articulation Points - Tarjan alg
+- As we check, count num_nodes to pick the most even split

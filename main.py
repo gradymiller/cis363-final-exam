@@ -7,13 +7,6 @@ class State:
     def __init__(self, nodes, best_size):
         self.nodes = nodes
         self.best_size = best_size
-        self.degrees = [set() for _ in range(len(nodes) + 1))]
-        self.set_degrees()
-
-    def set_degrees(self):
-        for idx, node in enumerate(self.nodes):
-            deg = node.bit_count()
-            self.degrees[deg].add(idx)
 
     def next_index(self, remaining):
         best_idx = -1
