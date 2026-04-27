@@ -169,12 +169,12 @@ std::pair<std::bitset<200>, int> simplify(const std::vector<std::bitset<200>>& n
 void solve(const std::vector<std::bitset<200>>& nodes, int& best_size, std::bitset<200> remaining, int curr_size) {
 	if (curr_size >= best_size) return;
 
-	int added;
-	auto p = simplify(nodes, remaining);
-	remaining = p.first;
-	added = p.second;
+	// int added;
+    // auto p = simplify(nodes, remaining);
+	// remaining = p.first;
+	// added = p.second;
 
-	curr_size += added;
+	// curr_size += added;
 
 	if (curr_size + matching(nodes, remaining) >= best_size) return;
 
@@ -212,9 +212,10 @@ int main() {
 	for (int i = 0; i < n; i++) initial.set(i);
 
 	int best_size = n;
-	approximate(nodes, best_size, initial, 0);
+	auto [intial, added] = simplify(nodes, initial);
+    approximate(nodes, best_size, initial, added);
 
-	solve(nodes, best_size, initial, 0);
+	solve(nodes, best_size, initial, added);
 	std::cout << best_size;
 	
 	return 0;
